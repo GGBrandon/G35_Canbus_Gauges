@@ -1,53 +1,156 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-H21 | ESP32-H4 | ESP32-P4 | ESP32-S2 | ESP32-S3 | Linux |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | --------- | -------- | --------- | -------- | -------- | -------- | -------- | ----- |
+# G35 CAN Bus Gauges
 
-# Hello World Example
+ESP32-C3 based digital gauge project for a 2007 Infiniti G35 VQ35HR.
 
-Starts a FreeRTOS task to print "Hello World".
+The project communicates with the vehicle over CAN bus using an SN65HVD230 CAN transceiver and retrieves OBD-II data such as engine RPM. The data is then displayed on an LCD. Currently only displays Engine RPM. Current version has not been tested, but components work individually. 
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+## Current Features
 
-## How to use example
+* ESP32-C3 CAN bus communication
+* 500 kbps CAN bitrate
+* Standard OBD-II Mode 01 requests
+* Engine RPM (PID `0x0C`) retrieval
+* 16x2 LCD display
+* Modular ESP-IDF component structure
+* CAN error reporting
 
-Follow detailed instructions provided specifically for this example.
+## Hardware
 
-Select the instructions depending on Espressif chip installed on your development board:
+### Microcontroller
 
-- [ESP32 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/stable/get-started/index.html)
-- [ESP32-S2 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/get-started/index.html)
+* ESP32-C3
 
+### CAN Transceiver
 
-## Example folder contents
+* SN65HVD230
 
-The project **hello_world** contains one source file in C language [hello_world_main.c](main/hello_world_main.c). The file is located in folder [main](main).
+### LCD
 
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt` files that provide set of directives and instructions describing the project's source files and targets (executable, library, or both).
+* 1602 LCD
 
-Below is short explanation of remaining files in the project folder.
+## CAN Connections
 
+ESP32-C3:
+
+| ESP32-C3 | SN65HVD230 |
+| -------- | ---------- |
+| GPIO 21  | TXD        |
+| GPIO 20  | RXD        |
+| 3.3V     | VCC        |
+| GND      | GND        |
+
+The SN65HVD230 CANH/CANL connections are connected to the vehicle CAN bus through the OBD-II connector pinout.
+
+## OBD-II RPM Request
+
+The project uses the standard OBD-II broadcast request ID:
+
+```text
+0x7DF
 ```
+
+The RPM request is:
+
+```text
+02 01 0C 00 00 00 00 00
+```
+
+Where:
+
+* `02` = number of OBD data bytes
+* `01` = Mode 01, current powertrain data
+* `0C` = Engine RPM PID
+
+A typical ECU response is:
+
+```text
+ID:   0x7E8
+DATA: 04 41 0C AA BB 00 00 00
+```
+
+The RPM is calculated using:
+
+```text
+RPM = ((A × 256) + B) / 4
+```
+
+where `A` and `B` are bytes 3 and 4 of the response.
+
+## Project Structure
+
+```text
+g35_canbus_gauges/
+│
 ├── CMakeLists.txt
-├── pytest_hello_world.py      Python script used for automated testing
-├── main
+├── sdkconfig
+│
+├── main/
 │   ├── CMakeLists.txt
-│   └── hello_world_main.c
-└── README.md                  This is the file you are currently reading
+│   └── main.c
+│
+└── components/
+    │
+    ├── canSender/
+    │   ├── CMakeLists.txt
+    │   ├── canSender.c
+    │   └── canSender.h
+    │
+    └── LCD1602/
+        ├── CMakeLists.txt
+        ├── LCD1602.c
+        └── LCD1602.h
 ```
 
-For more information on structure and contents of ESP-IDF projects, please refer to Section [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html) of the ESP-IDF Programming Guide.
+The current application:
 
-## Troubleshooting
+1. Initializes CAN
+2. Initializes the LCD
+3. Requests engine RPM
+4. Waits for the matching ECU response
+5. Decodes RPM
+6. Displays RPM
+7. Repeats every 500 ms
 
-* Program upload failure
+## Configuration
 
-    * Hardware connection is not correct: run `idf.py -p PORT monitor`, and reboot your board to see if there are any output logs.
-    * The baud rate for downloading is too high: lower your baud rate in the `menuconfig` menu, and try again.
+Current CAN configuration:
 
-## Technical support and feedback
+```c
+#define TWAI_TX_GPIO       21
+#define TWAI_RX_GPIO       20
+#define TWAI_BITRATE       500000
+```
 
-Please use the following feedback channels:
+OBD-II IDs:
 
-* For technical queries, go to the [esp32.com](https://esp32.com/) forum
-* For a feature request or bug report, create a [GitHub issue](https://github.com/espressif/esp-idf/issues)
+```c
+#define OBD_REQUEST_ID     0x7DF
+#define OBD_RESPONSE_ID    0x7E8
+```
 
-We will get back to you as soon as possible.
+## Roadmap
+
+Planned functionality includes retrieving additional vehicle data and displaying multiple values on a larger gauge display.
+
+Potential data points:
+
+* Engine oil temperature
+* Engine oil pressure
+* Coolant temperature
+* Engine load
+* Intake air temperature
+* Fuel-related data
+## Development Notes
+
+The vehicle continuously transmits many CAN messages that are unrelated to the requested OBD-II PID.
+
+The CAN receiver therefore does not assume that the next received frame is the requested response. It filters incoming frames and only accepts the expected RPM response:
+
+```text
+ID   = 0x7E8
+DATA = 04 41 0C ...
+```
+
+Other CAN frames are ignored.
+
+CAN errors are still reported through the TWAI error callback.
