@@ -13,6 +13,9 @@ The project communicates with the vehicle over CAN bus using an SN65HVD230 CAN t
 * 16x2 LCD display
 * Modular ESP-IDF component structure
 * CAN error reporting
+![Photo 1](CANGaugeV1.jpg)
+
+![Photo 2](CANGaugeV1(2).jpg)
 
 ## Hardware
 
@@ -76,6 +79,38 @@ RPM = ((A × 256) + B) / 4
 
 where `A` and `B` are bytes 3 and 4 of the response.
 
+## Oil Temperature Request
+
+The project uses a Nissan proprietary Service 21 request to retrieve engine oil temperature.
+
+The oil temperature request is:
+
+```text
+21 E0 04 01
+```
+Where:
+
+* `21` = Nissan Service 21 data request
+* `E0 04` = Nissan proprietary oil temperature identifier
+* `01` = requested data item
+
+A typical ECU response is:
+
+```text
+ID:   0x7E8
+DATA: 05 61 00 XX 00 00 00 00
+```
+
+Where XX is the raw temperature value 
+
+The oil is calcualated in F as 
+
+```text
+((A) - 50.0f) * 9.0f / 5.0f + 32.0f;
+```
+
+where `A` is the raw temperature value 
+
 ## Project Structure
 
 ```text
@@ -105,11 +140,11 @@ The current application:
 
 1. Initializes CAN
 2. Initializes the LCD
-3. Requests engine RPM
+3. Requests engine RPM or Oil depending on screen selection
 4. Waits for the matching ECU response
-5. Decodes RPM
-6. Displays RPM
-7. Repeats every 500 ms
+5. Decodes request response
+6. Displays requesint information
+7. Repeats every 50 ms
 
 ## Configuration
 
@@ -124,17 +159,18 @@ Current CAN configuration:
 OBD-II IDs:
 
 ```c
-#define OBD_REQUEST_ID     0x7DF
-#define OBD_RESPONSE_ID    0x7E8
+#define OBD_FUNCTION_ID 0x7DF 
+#define OBD_ENGINE_ID 0x7E0   
+#define OBD_RESPONSE_ID 0x7E8 
 ```
 
 ## Roadmap
+Next revision will shift the circuit to a **Waveshare ESP32-S3 3.16inch Display**. This will require reconfiguring the display code. It will allow for less wiring and easier testing. I already have a setup to record CAN bus data using the onbaord SD card reader. 
 
 Planned functionality includes retrieving additional vehicle data and displaying multiple values on a larger gauge display.
 
 Potential data points:
 
-* Engine oil temperature
 * Engine oil pressure
 * Coolant temperature
 * Engine load

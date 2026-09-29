@@ -10,53 +10,139 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-//components
+#include "driver/gpio.h"
+
+ //components
 #include "canSender.h"
 #include "LCD1602.h"
 
+//button temp
+#define BUTTON_GPIO GPIO_NUM_0
 
-void app_main(void)
-{   
-    //Error check
+
+
+void app_main(void) {
+
+    gpio_config_t button_config = {
+      .pin_bit_mask = (1ULL << BUTTON_GPIO),
+      .mode = GPIO_MODE_INPUT,
+      .pull_up_en = GPIO_PULLUP_ENABLE,
+      .pull_down_en = GPIO_PULLDOWN_DISABLE,
+      .intr_type = GPIO_INTR_DISABLE
+    };
+
+    gpio_config(&button_config);
+
+    // Error check
     ESP_ERROR_CHECK(can_sender_init());
-    //init display
-    lcd_init(); 
 
-    while (1)
-    {
-        if (can_sender_request_rpm() == ESP_OK)
-        {
-            uint16_t rpm;
+    // init display
+    lcd_init();
+    lcd_clear();
+    lcd_set_cursor(0, 0);
+    lcd_print("Ready"); // print to screen
 
-            
-            //recieved correct byte
-            if (can_sender_get_rpm(&rpm) == ESP_OK)  {
-
-                char rpm_text[16];
-
-               snprintf(rpm_text, sizeof(rpm_text), "%u", rpm);
-
-                lcd_clear();
-                lcd_set_cursor(0, 0);
-                lcd_print("ENGINE RPM"); //print to screen
-
-                lcd_set_cursor(0,1);
-                lcd_print(rpm_text);
+    int current_display = 2;
 
 
-                printf("ENGINE RPM: %u\n", rpm); //print to console 
+    while (1) {
+
+        if (gpio_get_level(BUTTON_GPIO) == 0) {
+            lcd_clear();
+            current_display++;
+            printf("press");
+
+            if (current_display > 3) {
+                current_display = 1;
+
             }
-            //did not recieve correct byte
-            else {   
 
-                lcd_clear();
-                lcd_set_cursor(0,1);
-                lcd_print("No RPM response"); //print to screen
-
-                printf("No RPM response\n"); //print to console
+            // wait for button release
+            while (gpio_get_level(BUTTON_GPIO) == 0) {
+                vTaskDelay(pdMS_TO_TICKS(10));
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(500));
+
+        /*
+         * Display 1: Engine RPM
+         */
+        if (current_display == 1) {
+            float rpm;
+
+
+            lcd_set_cursor(0, 0);
+            lcd_print("ENGINE RPM");
+
+            if (can_sender_request_pid(PID_RPM) == ESP_OK) {
+                if (can_sender_get_pid(PID_RPM, &rpm) == ESP_OK) {
+                    char rpm_text[16];
+
+                    snprintf(
+                        rpm_text,
+                        sizeof(rpm_text),
+                        "%.0f",
+                        rpm
+                    );
+
+                    lcd_set_cursor(0, 1);
+                    lcd_print(rpm_text);
+
+                    //print to console
+                    printf(
+                        "ENGINE RPM: %.0f\n",
+                        rpm
+                    );
+                }
+            }
+        }
+
+
+        /*
+         * Display 2: Engine Oil Temperature
+         */
+        else if (current_display == 2) {
+            float oil_temp;
+
+            lcd_set_cursor(0, 0);
+            lcd_print("OIL TEMP");
+
+            if (can_sender_request_pid(PID_OIL_TEMP) == ESP_OK) {
+                if (can_sender_get_pid(PID_OIL_TEMP, &oil_temp) == ESP_OK) {
+                    char oil_temp_text[16];
+
+                    snprintf(
+                        oil_temp_text,
+                        sizeof(oil_temp_text),
+                        "%.0f F",
+                        oil_temp
+                    );
+
+
+
+
+                    lcd_set_cursor(0, 1);
+                    lcd_print(oil_temp_text);
+
+                    //print to console
+                    printf(
+                        "OIL TEMP: %.0f F\n",
+                        oil_temp
+                    );
+                }
+            }
+
+        }
+        // check to see if button works
+        else if (current_display == 3) {
+            printf("display 3");
+            lcd_print("display 3");
+        }
+
+
+        /*
+         * Wait before requesting the next value
+         */\
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
