@@ -1,9 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2010-2022 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: CC0-1.0
- */
-
 #include <stdio.h>
 #include <stdint.h>
 
@@ -12,17 +6,42 @@
 
 #include "driver/gpio.h"
 
- //components
+//components
 #include "canSender.h"
-#include "LCD1602.h"
-
-//button temp
-#define BUTTON_GPIO GPIO_NUM_0
+#include "lcdDisplay.h"
+#include "lcdConfig.h"
 
 
 
 void app_main(void) {
+    
+    lcd_init();
 
+
+    while (1) {
+
+        lcd_fill(COLOR_GREEN);
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        lcd_fill(COLOR_BLUE);
+
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        lcd_fill(COLOR_BLACK);
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        lcd_fill(COLOR_MAGENTA);
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
+}
+
+
+/*
     gpio_config_t button_config = {
       .pin_bit_mask = (1ULL << BUTTON_GPIO),
       .mode = GPIO_MODE_INPUT,
@@ -41,6 +60,8 @@ void app_main(void) {
     lcd_clear();
     lcd_set_cursor(0, 0);
     lcd_print("Ready"); // print to screen
+
+
 
     int current_display = 2;
 
@@ -64,9 +85,7 @@ void app_main(void) {
         }
 
 
-        /*
-         * Display 1: Engine RPM
-         */
+
         if (current_display == 1) {
             float rpm;
 
@@ -98,9 +117,7 @@ void app_main(void) {
         }
 
 
-        /*
-         * Display 2: Engine Oil Temperature
-         */
+
         else if (current_display == 2) {
             float oil_temp;
 
@@ -140,9 +157,8 @@ void app_main(void) {
         }
 
 
-        /*
-         * Wait before requesting the next value
-         */\
+
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
+*/
