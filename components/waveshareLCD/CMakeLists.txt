@@ -5,6 +5,8 @@ idf_component_register(
     REQUIRES esp_driver_ledc 
     REQUIRES esp_lcd_st7701 esp_lcd
     REQUIRES esp_lcd_panel_io_additions
+    REQUIRES lvgl
+    REQUIRES esp_timer
 )
 
 

@@ -6,6 +6,8 @@
 
 #include "driver/gpio.h"
 
+#include "lvgl.h"
+
 //components
 #include "canSender.h"
 #include "lcdDisplay.h"
@@ -13,33 +15,44 @@
 
 
 
-void app_main(void) {
-    
+
+void app_main(void)
+{
     lcd_init();
+    lcd_lvgl_init();
+
+    lv_obj_t *screen = lv_screen_active();
+
+    lv_obj_t *obj = lv_obj_create(screen);
+
+    lv_obj_set_size(obj, 200, 200);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(COLOR_BLACK), 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+
+    lv_obj_center(obj);
+
+    lv_obj_t *label = lv_label_create(screen);
+    lv_label_set_text(label, "LVGL Ex Test!");
+
+    lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_center(label);
+}
+/*
+
+while (1) {
+
+    lcd_fill(COLOR_GREEN);
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    lcd_fill(COLOR_BLUE);
 
 
-    while (1) {
-
-        lcd_fill(COLOR_GREEN);
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
-        lcd_fill(COLOR_BLUE);
-
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
-        lcd_fill(COLOR_BLACK);
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
-        lcd_fill(COLOR_MAGENTA);
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-
+    vTaskDelay(pdMS_TO_TICKS(1000));
 }
 
+}
+*/
 
 /*
     gpio_config_t button_config = {

@@ -66,12 +66,32 @@
 
 // preset color values I chose
 
+/* 
+* These are for 16-Bit RGB
 #define COLOR_BLACK   0x0000  
 #define COLOR_WHITE   0xFFFF  
 #define COLOR_RED     0xF800  
 #define COLOR_GREEN   0x07E0  
 #define COLOR_BLUE    0x001F  
 #define COLOR_MAGENTA 0xF81F  
+*/
+
+// These are hex for LVGL
+#define COLOR_BLACK    0x000000
+#define COLOR_WHITE    0xFFFFFF
+#define COLOR_RED      0xFF0000
+#define COLOR_GREEN    0x00FF00
+#define COLOR_BLUE     0x0000FF
+#define COLOR_MAGENTA  0xFF00FF
+
+// LVGL
+// taken from offical Waveshare example
+#define LVGL_TICK_PERIOD_MS    2
+#define LVGL_TASK_MAX_DELAY_MS 500
+#define LVGL_TASK_MIN_DELAY_MS 1
+#define LVGL_TASK_STACK_SIZE   (4 * 1024)
+#define LVGL_TASK_PRIORITY     5
+
 
 
 #endif // LCD_CONFIG_H

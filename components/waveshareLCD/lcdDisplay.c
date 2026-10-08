@@ -9,15 +9,21 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_rgb.h"
 #include "esp_heap_caps.h"
-
-
 #include "esp_lcd_st7701.h"
 #include "esp_lcd_panel_io_additions.h"
+
+#include "lvgl.h"
+#include "esp_timer.h"
+#include "freertos/semphr.h"
 
 #include "driver/ledc.h"
 
 
 esp_lcd_panel_handle_t panel_handle = NULL;  // RGB panel handle
+
+// lvgl flush
+static SemaphoreHandle_t lvgl_mux = NULL;
+static SemaphoreHandle_t flush_done_semaphore = NULL;
 
 // from waveshare demo
 static const st7701_lcd_init_cmd_t lcd_init_cmds[] =
@@ -71,13 +77,26 @@ static const st7701_lcd_init_cmd_t lcd_init_cmds[] =
     { 0x29,(uint8_t[]) { 0x00 },0,20 },
 };
 
+
+static bool rgb_panel_frame_done(
+    esp_lcd_panel_handle_t panel,
+    const esp_lcd_rgb_panel_event_data_t* edata,
+    void* user_ctx) {
+    BaseType_t high_task_awoken = pdFALSE;
+
+    xSemaphoreGiveFromISR(
+        flush_done_semaphore,
+        &high_task_awoken
+    );
+
+    return high_task_awoken == pdTRUE;
+}
+
 // RGB init
 static void rgb_panel_init(void) {
     printf("Initializing ST7701...\n");
 
-    // ---------------------------------------------------------
     // 3-wire SPI configuration for ST7701 initialization
-    // ---------------------------------------------------------
     spi_line_config_t line_config = {
         .cs_io_type = IO_TYPE_GPIO,
         .cs_gpio_num = LCD_CS,
@@ -105,9 +124,7 @@ static void rgb_panel_init(void) {
     printf("ST7701 SPI initialized\n");
 
 
-    // ---------------------------------------------------------
     // RGB parallel configuration
-    // ---------------------------------------------------------
     esp_lcd_rgb_panel_config_t rgb_config = {
         .clk_src = LCD_CLK_SRC_DEFAULT,
 
@@ -131,14 +148,14 @@ static void rgb_panel_init(void) {
         // IMPORTANT:
         // The Waveshare wiring is B-G-R.
         .data_gpio_nums = {
-            
+
             LCD_B0,
             LCD_B1,
             LCD_B2,
             LCD_B3,
             LCD_B4,
 
-            
+
             LCD_G0,
             LCD_G1,
             LCD_G2,
@@ -146,7 +163,7 @@ static void rgb_panel_init(void) {
             LCD_G4,
             LCD_G5,
 
-            
+
             LCD_R0,
             LCD_R1,
             LCD_R2,
@@ -171,9 +188,7 @@ static void rgb_panel_init(void) {
     };
 
 
-    // ---------------------------------------------------------
     // ST7701 vendor configuration
-    // ---------------------------------------------------------
     st7701_vendor_config_t vendor_config = {
         .rgb_config = &rgb_config,
 
@@ -212,6 +227,18 @@ static void rgb_panel_init(void) {
 
     printf("ST7701 panel created\n");
 
+    esp_lcd_rgb_panel_event_callbacks_t cbs = {
+    .on_color_trans_done = rgb_panel_frame_done,
+    };
+
+    ESP_ERROR_CHECK(
+        esp_lcd_rgb_panel_register_event_callbacks(
+            panel_handle,
+            &cbs,
+            NULL
+        )
+    );
+
     ESP_ERROR_CHECK(
         esp_lcd_panel_reset(panel_handle)
     );
@@ -221,6 +248,11 @@ static void rgb_panel_init(void) {
     ESP_ERROR_CHECK(
         esp_lcd_panel_init(panel_handle)
     );
+
+    ESP_ERROR_CHECK(
+        esp_lcd_panel_disp_on_off(panel_handle, true)
+    );
+
 
     printf("ST7701 initialized\n");
 }
@@ -293,6 +325,7 @@ void lcd_backlight_init(uint16_t duty) {
 
 // call function
 void lcd_init(void) {
+
     printf("Initializing LCD...\n");
 
     lcd_backlight_init(LCD_PWM_MODE_255);
@@ -300,4 +333,146 @@ void lcd_init(void) {
     rgb_panel_init();
 
     printf("LCD initialized\n");
+}
+
+// LVGL specifics
+
+static void lvgl_tick(void* arg) {
+    lv_tick_inc(LVGL_TICK_PERIOD_MS);
+}
+
+static void lvgl_flush_cb(
+    lv_display_t* disp,
+    const lv_area_t* area,
+    uint8_t* color_p) {
+    esp_lcd_panel_handle_t panel =
+        (esp_lcd_panel_handle_t)lv_display_get_user_data(disp);
+
+    esp_lcd_panel_draw_bitmap(
+        panel,
+        area->x1,
+        area->y1,
+        area->x2 + 1,
+        area->y2 + 1,
+        color_p
+    );
+}
+
+static void lvgl_flush_wait_cb(lv_display_t* disp) {
+    xSemaphoreTake(flush_done_semaphore, portMAX_DELAY);
+}
+
+
+
+static void lvgl_task(void* arg) {
+    uint32_t delay_ms = LVGL_TASK_MAX_DELAY_MS;
+
+    while (1) {
+        if (xSemaphoreTake(lvgl_mux, portMAX_DELAY)) {
+            delay_ms = lv_timer_handler();
+
+            xSemaphoreGive(lvgl_mux);
+        }
+
+        if (delay_ms > LVGL_TASK_MAX_DELAY_MS) {
+            delay_ms = LVGL_TASK_MAX_DELAY_MS;
+        }
+        else if (delay_ms < LVGL_TASK_MIN_DELAY_MS) {
+            delay_ms = LVGL_TASK_MIN_DELAY_MS;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(delay_ms));
+    }
+}
+
+
+void lcd_lvgl_init(void) {
+    printf("Initializing LVGL...\n");
+
+    lv_init();
+
+    lvgl_mux = xSemaphoreCreateMutex();
+    assert(lvgl_mux);
+
+    flush_done_semaphore = xSemaphoreCreateBinary();
+    assert(flush_done_semaphore);
+
+
+    lv_display_t* disp =
+        lv_display_create(LCD_H_RES, LCD_V_RES);
+
+    assert(disp);
+
+
+    lv_display_set_user_data(disp, panel_handle);
+
+
+    lv_display_set_flush_cb(disp, lvgl_flush_cb);
+
+
+    lv_display_set_flush_wait_cb(disp, lvgl_flush_wait_cb);
+
+
+    size_t buffer_size =
+        LCD_H_RES * LCD_V_RES * sizeof(lv_color_t);
+
+    void* buf_1 = heap_caps_malloc(
+        buffer_size,
+        MALLOC_CAP_SPIRAM
+    );
+
+    printf("buf_1 = %p\n", buf_1);
+
+    void* buf_2 = heap_caps_malloc(
+        buffer_size,
+        MALLOC_CAP_SPIRAM
+    );
+
+    printf("buf_2 = %p\n", buf_2);
+
+    assert(buf_1);
+    assert(buf_2);
+
+    lv_display_set_buffers(
+        disp,
+        buf_1,
+        buf_2,
+        buffer_size,
+        LV_DISPLAY_RENDER_MODE_PARTIAL
+    );
+
+    const esp_timer_create_args_t tick_args = {
+        .callback = lvgl_tick,
+        .name = "lvgl_tick"
+    };
+
+    esp_timer_handle_t lvgl_tick_timer = NULL;
+
+    ESP_ERROR_CHECK(
+        esp_timer_create(
+            &tick_args,
+            &lvgl_tick_timer
+        )
+    );
+
+
+    ESP_ERROR_CHECK(
+        esp_timer_start_periodic(
+            lvgl_tick_timer,
+            LVGL_TICK_PERIOD_MS * 1000
+        )
+    );
+
+    BaseType_t result = xTaskCreate(
+        lvgl_task,
+        "LVGL",
+        LVGL_TASK_STACK_SIZE,
+        NULL,
+        LVGL_TASK_PRIORITY,
+        NULL
+    );
+
+    assert(result == pdPASS);
+
+    printf("LVGL initialized\n");
 }
