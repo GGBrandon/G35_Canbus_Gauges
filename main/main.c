@@ -18,25 +18,68 @@
 
 void app_main(void)
 {
+
+    float oil_temp;
+
     lcd_init();
     lcd_lvgl_init();
 
     lv_obj_t *screen = lv_screen_active();
 
+    // Black background object
     lv_obj_t *obj = lv_obj_create(screen);
-
-    lv_obj_set_size(obj, 200, 200);
+    lv_obj_set_size(obj, 280, 400);
     lv_obj_set_style_bg_color(obj, lv_color_hex(COLOR_BLACK), 0);
     lv_obj_set_style_border_width(obj, 0, 0);
-
     lv_obj_center(obj);
 
-    lv_obj_t *label = lv_label_create(screen);
-    lv_label_set_text(label, "LVGL Ex Test!");
+    // Oil Temp title
+    lv_obj_t *oil_title = lv_label_create(screen);
+    lv_label_set_text(oil_title, "OIL TEMP");
+    lv_obj_set_style_text_font(oil_title, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_color(oil_title, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(oil_title, LV_ALIGN_CENTER, 0, -100);
 
-    lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_center(label);
+    // Oil temperature value
+    lv_obj_t *oil_label = lv_label_create(screen);
+    lv_label_set_text(oil_label, "-- F");
+    lv_obj_set_style_text_color(oil_label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(oil_label, LV_ALIGN_CENTER, 0, 20);
+
+    // Error check
+    ESP_ERROR_CHECK(can_sender_init());
+
+
+    while (1)
+    {
+        
+
+        // Request oil temperature over CAN
+        if (can_sender_request_pid(PID_OIL_TEMP) == ESP_OK)
+        {
+            if (can_sender_get_pid(PID_OIL_TEMP, &oil_temp) == ESP_OK)
+            {
+                char oil_temp_text[16];
+
+                snprintf(
+                    oil_temp_text,
+                    sizeof(oil_temp_text),
+                    "%.0f F",
+                    oil_temp
+                );
+
+                
+                // Update LVGL label
+                lv_label_set_text(oil_label, oil_temp_text);
+
+                printf("OIL TEMP: %.0f F\n", oil_temp);
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
 }
+
 /*
 
 while (1) {
