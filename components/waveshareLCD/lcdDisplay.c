@@ -12,6 +12,8 @@
 #include "esp_lcd_st7701.h"
 #include "esp_lcd_panel_io_additions.h"
 
+
+
 #include "lvgl.h"
 #include "esp_timer.h"
 #include "freertos/semphr.h"
@@ -130,7 +132,7 @@ static void rgb_panel_init(void) {
 
         .data_width = 16,
 
-        .num_fbs = 1,
+        .num_fbs = 2,
 
         .bounce_buffer_size_px = 10 * LCD_H_RES,
 
@@ -413,8 +415,7 @@ void lcd_lvgl_init(void) {
     lv_display_set_flush_wait_cb(disp, lvgl_flush_wait_cb);
 
 
-    size_t buffer_size =
-        LCD_H_RES * LCD_V_RES * sizeof(lv_color_t);
+    size_t buffer_size = LCD_H_RES * LCD_V_RES * sizeof(lv_color_t);
 
     void* buf_1 = heap_caps_malloc(
         buffer_size,

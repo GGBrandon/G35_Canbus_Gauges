@@ -13,6 +13,38 @@
 #include "lcdDisplay.h"
 #include "lcdConfig.h"
 
+#include "ui.h"
+#include "screens.h"
+
+
+void update_gauge(int value)
+{
+    lv_arc_set_value(objects.obj0, value);
+
+    lv_color_t color;
+
+    if (value < 180) {
+        color = lv_color_hex(0x4CD0FC);  // Cyan ish
+    } else if (value <= 230) {
+        color = lv_color_hex(0x00FF3B);  // Green
+    } else {
+        color = lv_color_hex(0xFF0000);  // Red
+    }
+
+    lv_obj_set_style_arc_color(
+        objects.obj0,
+        color,
+        LV_PART_INDICATOR | LV_STATE_DEFAULT
+    );
+
+    update_needle(value); //move needle
+
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", value);
+    lv_label_set_text(objects.oilLabel, buf);
+
+
+}
 
 
 
@@ -24,61 +56,33 @@ void app_main(void)
     lcd_init();
     lcd_lvgl_init();
 
-    lv_obj_t *screen = lv_screen_active();
+    ui_init();
 
-    // Black background object
-    lv_obj_t *obj = lv_obj_create(screen);
-    lv_obj_set_size(obj, 280, 400);
-    lv_obj_set_style_bg_color(obj, lv_color_hex(COLOR_BLACK), 0);
-    lv_obj_set_style_border_width(obj, 0, 0);
-    lv_obj_center(obj);
+    // gauge example
+    int i = 60;
+    while(i < 250) {
 
-    // Oil Temp title
-    lv_obj_t *oil_title = lv_label_create(screen);
-    lv_label_set_text(oil_title, "OIL TEMP");
-    lv_obj_set_style_text_font(oil_title, &lv_font_montserrat_32, 0);
-    lv_obj_set_style_text_color(oil_title, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_align(oil_title, LV_ALIGN_CENTER, 0, -100);
+        update_gauge(i);
+        lv_timer_handler();
+        i+= 10;
+        vTaskDelay(pdMS_TO_TICKS(3000));
 
-    // Oil temperature value
-    lv_obj_t *oil_label = lv_label_create(screen);
-    lv_label_set_text(oil_label, "-- F");
-    lv_obj_set_style_text_color(oil_label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_align(oil_label, LV_ALIGN_CENTER, 0, 20);
+       
+       
+       
 
-    // Error check
-    ESP_ERROR_CHECK(can_sender_init());
-
-
-    while (1)
-    {
-        
-
-        // Request oil temperature over CAN
-        if (can_sender_request_pid(PID_OIL_TEMP) == ESP_OK)
-        {
-            if (can_sender_get_pid(PID_OIL_TEMP, &oil_temp) == ESP_OK)
-            {
-                char oil_temp_text[16];
-
-                snprintf(
-                    oil_temp_text,
-                    sizeof(oil_temp_text),
-                    "%.0f F",
-                    oil_temp
-                );
-
-                
-                // Update LVGL label
-                lv_label_set_text(oil_label, oil_temp_text);
-
-                printf("OIL TEMP: %.0f F\n", oil_temp);
-            }
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(100));
     }
+
+    
+
+
+
+
 }
+
+  
+
+
 
 /*
 
