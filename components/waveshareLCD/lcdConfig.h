@@ -3,9 +3,11 @@
 
 #include "driver/gpio.h"
 
+
 //=======================================================
 // Specifications from official Waveshare LVGL V9 example
 //=======================================================
+
 
 
 //Pin Defs
@@ -62,7 +64,7 @@
 
 #define LCD_H_RES 320  
 #define LCD_V_RES 820  
-#define LCD_PIXEL_CLOCK_HZ (18 * 1000 * 1000)  // 18 MHz pixel clock
+#define LCD_PIXEL_CLOCK_HZ (6 * 1000 * 1000)  // 18 MHz pixel clock
 
 // preset color values I chose
 
