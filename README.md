@@ -14,6 +14,11 @@ The project communicates with the vehicle over CAN bus using an SN65HVD230 CAN t
 * Modular ESP-IDF component structure
 * CAN error reporting
 
+* The arc color will change based on the temperture reading:
+    Blue = temp < 180
+    Green = 180 < temp < 230
+    Red = 230 < temp
+
 ![Photo 1](CANGaugeV1.jpg)
 ![Photo 2](CANGaugeV1(2).jpg)
 
