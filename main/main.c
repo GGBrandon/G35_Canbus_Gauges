@@ -101,27 +101,32 @@ void app_main(void) {
     //ui_init();
 
     // gauge example
-    float i = 60;
+    // float i = 60;
     char oil_temp_text[16];
 
 
-    while (i < 250) {
+      while (1) {
+        if (can_sender_request_pid(PID_OIL_TEMP) == ESP_OK) {
 
-    if (lvgl_lock(-1)) {
-        update_gauge(i);
+            if (can_sender_get_pid(PID_OIL_TEMP, &oil_temp) == ESP_OK) {
+                if (lvgl_lock(-1)) {
 
-        snprintf(
-            oil_temp_text,
-            sizeof(oil_temp_text),
-            "%.0f F",
-            (double)i
-        );
+                    update_gauge(oil_temp);
 
-        // lv_label_set_text(oil_label, oil_temp_text);
+                    snprintf(
+                        oil_temp_text,
+                        sizeof(oil_temp_text),
+                        "%.0f F",
+                        (double)i
+                    );
+                    
+                    lvgl_unlock();
+                }
+            }
 
-        lvgl_unlock();
+            vTaskDelay(pdMS_TO_TICKS(60));
+        }
     }
-}
 
 }
 
