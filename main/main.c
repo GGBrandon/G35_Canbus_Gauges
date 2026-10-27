@@ -1,9 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2010-2022 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: CC0-1.0
- */
-
 #include <stdio.h>
 #include <stdint.h>
 
@@ -12,17 +6,144 @@
 
 #include "driver/gpio.h"
 
- //components
-#include "canSender.h"
-#include "LCD1602.h"
+#include "lvgl.h"
 
-//button temp
-#define BUTTON_GPIO GPIO_NUM_0
+//components
+#include "canSender.h"
+#include "lcdDisplay.h"
+#include "lcdConfig.h"
+
+#include "ui.h"
+#include "screens.h"
+
+lv_obj_t* oil_label;
+
+
+void update_gauge(int value) {
+    lv_arc_set_value(objects.obj0, value);
+
+    lv_color_t color;
+
+    if (value < 180) {
+        color = lv_color_hex(0x4CD0FC);  // Cyan ish
+    }
+    else if (value <= 230) {
+        color = lv_color_hex(0x00FF3B);  // Green
+    }
+    else {
+        color = lv_color_hex(0xFF0000);  // Red
+    }
+
+    lv_obj_set_style_arc_color(
+        objects.obj0,
+        color,
+        LV_PART_INDICATOR | LV_STATE_DEFAULT
+    );
+
+    update_needle(value); //move needle
+
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", value);
+    lv_label_set_text(objects.oilLabel, buf);
+
+
+}
 
 
 
 void app_main(void) {
 
+    float oil_temp;
+
+    lcd_init();
+    lcd_lvgl_init();
+
+
+    if (lvgl_lock(-1)) {
+
+        /*
+        printf("unlocked");
+        lv_obj_t* screen = lv_screen_active();
+
+        // Black background object
+        lv_obj_t* obj = lv_obj_create(screen);
+        lv_obj_set_size(obj, 280, 400);
+        lv_obj_set_style_bg_color(obj, lv_color_hex(COLOR_BLACK), 0);
+        lv_obj_set_style_border_width(obj, 0, 0);
+        lv_obj_center(obj);
+        printf("black rect");
+
+        // Oil Temp title
+        lv_obj_t* oil_title = lv_label_create(screen);
+        lv_label_set_text(oil_title, "OIL TEMP");
+        lv_obj_set_style_text_font(oil_title, &lv_font_montserrat_32, 0);
+        lv_obj_set_style_text_color(oil_title, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_align(oil_title, LV_ALIGN_CENTER, 0, -100);
+
+        // Oil temperature value
+        oil_label = lv_label_create(screen);
+        lv_label_set_text(oil_label, "-- F");
+        lv_obj_set_style_text_color(oil_label, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_align(oil_label, LV_ALIGN_CENTER, 0, -30);
+
+        */
+
+        ui_init();
+        lvgl_unlock();
+    }
+
+
+
+
+    // Error check
+    ESP_ERROR_CHECK(can_sender_init());
+
+    //ui_init();
+
+    // gauge example
+    float i = 60;
+    char oil_temp_text[16];
+
+
+    while (i < 250) {
+
+    if (lvgl_lock(-1)) {
+        update_gauge(i);
+
+        snprintf(
+            oil_temp_text,
+            sizeof(oil_temp_text),
+            "%.0f F",
+            (double)i
+        );
+
+        // lv_label_set_text(oil_label, oil_temp_text);
+
+        lvgl_unlock();
+    }
+}
+
+}
+
+
+/*
+
+while (1) {
+
+    lcd_fill(COLOR_GREEN);
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    lcd_fill(COLOR_BLUE);
+
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+}
+
+}
+*/
+
+/*
     gpio_config_t button_config = {
       .pin_bit_mask = (1ULL << BUTTON_GPIO),
       .mode = GPIO_MODE_INPUT,
@@ -41,6 +162,8 @@ void app_main(void) {
     lcd_clear();
     lcd_set_cursor(0, 0);
     lcd_print("Ready"); // print to screen
+
+
 
     int current_display = 2;
 
@@ -64,9 +187,7 @@ void app_main(void) {
         }
 
 
-        /*
-         * Display 1: Engine RPM
-         */
+
         if (current_display == 1) {
             float rpm;
 
@@ -98,9 +219,7 @@ void app_main(void) {
         }
 
 
-        /*
-         * Display 2: Engine Oil Temperature
-         */
+
         else if (current_display == 2) {
             float oil_temp;
 
@@ -140,9 +259,8 @@ void app_main(void) {
         }
 
 
-        /*
-         * Wait before requesting the next value
-         */\
+
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
+*/

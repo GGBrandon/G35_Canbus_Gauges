@@ -10,13 +10,7 @@
 #include "esp_twai.h"
 #include "esp_twai_onchip.h"
 
-#define TWAI_TX_GPIO 21
-#define TWAI_RX_GPIO 20
-#define TWAI_BITRATE 500000
 
-#define OBD_FUNCTION_ID 0x7DF // Standard request
-#define OBD_ENGINE_ID 0x7E0   // Nissan ECU specific request
-#define OBD_RESPONSE_ID 0x7E8 // ECU response
 
 static const char* TAG = "CAN_SENDER";
 
@@ -482,20 +476,20 @@ static esp_err_t can_sender_get_pid_raw(
         twai_frame_t* frame =
             &ctx.rx.frame;
 
-        printf(
-            "CAN ID: 0x%03lX DATA:",
-            frame->header.id);
+      //  printf(
+        //    "CAN ID: 0x%03lX DATA:",
+          //  frame->header.id);
 
         for (int i = 0;
             i < frame->buffer_len;
             i++) {
 
-            printf(
-                " %02X",
-                frame->buffer[i]);
+            //printf(
+              //  " %02X",
+                //frame->buffer[i]);
         }
 
-        printf("\n");
+       // printf("\n");
 
         /*
          * Make sure this came from ECU

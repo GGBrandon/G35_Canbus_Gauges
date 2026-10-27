@@ -4,6 +4,14 @@
 #include <stdint.h>
 #include "esp_err.h"
 
+#define TWAI_TX_GPIO 43
+#define TWAI_RX_GPIO 44
+#define TWAI_BITRATE 500000
+
+#define OBD_FUNCTION_ID 0x7DF // Standard request
+#define OBD_ENGINE_ID 0x7E0   // Nissan ECU specific request
+#define OBD_RESPONSE_ID 0x7E8 // ECU response
+
 /**
  * PID types.
  */

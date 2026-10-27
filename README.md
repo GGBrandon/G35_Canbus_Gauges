@@ -2,26 +2,31 @@
 
 ESP32-C3 based digital gauge project for a 2007 Infiniti G35 VQ35HR.
 
-The project communicates with the vehicle over CAN bus using an SN65HVD230 CAN transceiver and retrieves OBD-II data such as engine RPM. The data is then displayed on an LCD. Currently only displays Engine RPM. Current version has not been tested, but components work individually. 
+The project communicates with the vehicle over CAN bus using an SN65HVD230 CAN transceiver and retrieves OBD-II data such as engine RPM. The data is then displayed on an LCD. Currently only displays engine oil temperature with a custom gauge style made with Figma and EEZ studio. 
 
 ## Current Features
 
-* ESP32-C3 CAN bus communication
+* ESP32-S3 CAN bus communication
 * 500 kbps CAN bitrate
 * Standard OBD-II Mode 01 requests
 * Engine RPM (PID `0x0C`) retrieval
-* 16x2 LCD display
+* Waveshare 3.16 LCD Display
 * Modular ESP-IDF component structure
 * CAN error reporting
-![Photo 1](CANGaugeV1.jpg)
 
+* The arc color will change based on the temperture reading:
+    Blue = temp < 180
+    Green = 180 < temp < 230
+    Red = 230 < temp
+
+![Photo 1](CANGaugeV1.jpg)
 ![Photo 2](CANGaugeV1(2).jpg)
 
 ## Hardware
 
 ### Microcontroller
 
-* ESP32-C3
+* ESP32-S3
 
 ### CAN Transceiver
 
@@ -29,16 +34,16 @@ The project communicates with the vehicle over CAN bus using an SN65HVD230 CAN t
 
 ### LCD
 
-* 1602 LCD
+* Waveshare 3.16 LCD
 
 ## CAN Connections
 
-ESP32-C3:
+ESP32-S3:
 
-| ESP32-C3 | SN65HVD230 |
+| ESP32-S3 | SN65HVD230 |
 | -------- | ---------- |
-| GPIO 21  | TXD        |
-| GPIO 20  | RXD        |
+| GPIO 43  | TXD        |
+| GPIO 44  | RXD        |
 | 3.3V     | VCC        |
 | GND      | GND        |
 
@@ -130,29 +135,32 @@ g35_canbus_gauges/
     │   ├── canSender.c
     │   └── canSender.h
     │
-    └── LCD1602/
+    └── waveshareLCD/
         ├── CMakeLists.txt
-        ├── LCD1602.c
-        └── LCD1602.h
+        ├── lcdConfig.h
+        ├── lcdDisplay.c
+        └── lcdDisplay.h
+        
+        
 ```
 
 The current application:
 
 1. Initializes CAN
 2. Initializes the LCD
-3. Requests engine RPM or Oil depending on screen selection
+3. Requests engine Oil
 4. Waits for the matching ECU response
 5. Decodes request response
-6. Displays requesint information
-7. Repeats every 50 ms
+6. Displays requested information
+7. Repeats every 60 ms
 
 ## Configuration
 
 Current CAN configuration:
 
 ```c
-#define TWAI_TX_GPIO       21
-#define TWAI_RX_GPIO       20
+#define TWAI_TX_GPIO       43
+#define TWAI_RX_GPIO       44
 #define TWAI_BITRATE       500000
 ```
 
@@ -165,9 +173,7 @@ OBD-II IDs:
 ```
 
 ## Roadmap
-Next revision will shift the circuit to a **Waveshare ESP32-S3 3.16inch Display**. This will require reconfiguring the display code. It will allow for less wiring and easier testing. I already have a setup to record CAN bus data using the onbaord SD card reader. 
-
-Planned functionality includes retrieving additional vehicle data and displaying multiple values on a larger gauge display.
+Next revision will include more ECU data/requests
 
 Potential data points:
 
@@ -175,7 +181,7 @@ Potential data points:
 * Coolant temperature
 * Engine load
 * Intake air temperature
-* Fuel-related data
+* A/F Ratio
 ## Development Notes
 
 The vehicle continuously transmits many CAN messages that are unrelated to the requested OBD-II PID.
