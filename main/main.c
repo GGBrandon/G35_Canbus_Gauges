@@ -121,15 +121,9 @@ void app_main(void) {
 
         lvgl_unlock();
     }
-
-    printf("updoot\n");
-
-    i += 1;
-    vTaskDelay(pdMS_TO_TICKS(60));
 }
 
 }
-
 
 
 /*
