@@ -19,7 +19,68 @@
 lv_obj_t* oil_label;
 
 
+// testing vars
+static bool testingMode = true;
+static lv_obj_t* engine_load_title;
+static lv_obj_t* engine_load_label;
+
+static lv_obj_t* coolant_temp_title;
+static lv_obj_t* coolant_temp_label;
+
+
+
+
+
+// testing for coolant and engine load
+void sensorTestUI(void) {
+
+    printf("unlocked");
+
+    lv_obj_t* screen = lv_screen_active();
+
+    // Black background object
+    lv_obj_t* obj = lv_obj_create(screen);
+    lv_obj_set_size(obj, 280, 400);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(COLOR_BLACK), 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_center(obj);
+
+    printf("black rect");
+
+    // Engine load title
+    engine_load_title = lv_label_create(screen);
+    lv_label_set_text(engine_load_title, "ENGINE LOAD");
+    lv_obj_set_style_text_font(engine_load_title, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_color(engine_load_title, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(engine_load_title, LV_ALIGN_CENTER, 0, -120);
+
+    // Engine load value
+    engine_load_label = lv_label_create(screen);
+    lv_label_set_text(engine_load_label, "-- %");
+    lv_obj_set_style_text_color(engine_load_label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(engine_load_label, &lv_font_montserrat_32, 0);
+    lv_obj_align(engine_load_label, LV_ALIGN_CENTER, 0, -70);
+
+    // Coolant temperature title
+    coolant_temp_title = lv_label_create(screen);
+    lv_label_set_text(coolant_temp_title, "COOLANT TEMP");
+    lv_obj_set_style_text_font(coolant_temp_title, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_color(coolant_temp_title, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(coolant_temp_title, LV_ALIGN_CENTER, 0, 20);
+
+    // Coolant temperature value
+    coolant_temp_label = lv_label_create(screen);
+    lv_label_set_text(coolant_temp_label, "-- F");
+    lv_obj_set_style_text_color(coolant_temp_label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(coolant_temp_label, &lv_font_montserrat_32, 0);
+    lv_obj_align(coolant_temp_label, LV_ALIGN_CENTER, 0, 70);
+}
+
+
+
+// custom gauge ui setup
 void update_gauge(int value) {
+
     lv_arc_set_value(objects.obj0, value);
 
     lv_color_t color;
@@ -40,7 +101,7 @@ void update_gauge(int value) {
         LV_PART_INDICATOR | LV_STATE_DEFAULT
     );
 
-    update_needle(value); //move needle
+    update_needle(value); // move needle
 
     char buf[16];
     snprintf(buf, sizeof(buf), "%d", value);
@@ -50,78 +111,114 @@ void update_gauge(int value) {
 }
 
 
+// runs updates for sensor testing
+void sensorTestLoop(void) {
 
-void app_main(void) {
+    float value = 0.0f;
+    char text[32];
+
+    // Engine load
+    esp_err_t err =
+        can_sender_request_sensor(SENSOR_ENGINE_LOAD);
+
+    if (err == ESP_OK) {
+        err = can_sender_get_sensor(
+            SENSOR_ENGINE_LOAD,
+            &value);
+    }
+
+    if (err == ESP_OK) {
+        snprintf(text, sizeof(text), "%.1f %%", value);
+        lv_label_set_text(engine_load_label, text);
+    }
+    else {
+        lv_label_set_text(engine_load_label, "-- %");
+    }
+
+    // Coolant temperature
+    err =
+        can_sender_request_sensor(SENSOR_COOLANT_TEMP);
+
+    if (err == ESP_OK) {
+        err = can_sender_get_sensor(
+            SENSOR_COOLANT_TEMP,
+            &value);
+    }
+
+    if (err == ESP_OK) {
+        snprintf(text, sizeof(text), "%.1f F", value);
+        lv_label_set_text(coolant_temp_label, text);
+    }
+    else {
+        lv_label_set_text(coolant_temp_label, "-- F");
+    }
+}
+
+
+
+
+
+// runs updates for custom oil gauge 
+void oilTempLoop() {
 
     float oil_temp;
-
-    lcd_init();
-    lcd_lvgl_init();
+    char oil_temp_text[16];
 
 
-    if (lvgl_lock(-1)) {
+    if (can_sender_request_sensor(SENSOR_OIL_TEMP) == ESP_OK) {
 
-        /*
-        printf("unlocked");
-        lv_obj_t* screen = lv_screen_active();
+        if (can_sender_get_sensor(SENSOR_OIL_TEMP, &oil_temp) == ESP_OK) {
+            if (lvgl_lock(-1)) {
 
-        // Black background object
-        lv_obj_t* obj = lv_obj_create(screen);
-        lv_obj_set_size(obj, 280, 400);
-        lv_obj_set_style_bg_color(obj, lv_color_hex(COLOR_BLACK), 0);
-        lv_obj_set_style_border_width(obj, 0, 0);
-        lv_obj_center(obj);
-        printf("black rect");
+                update_gauge(oil_temp);
+                lvgl_unlock();
+            }
+        }
 
-        // Oil Temp title
-        lv_obj_t* oil_title = lv_label_create(screen);
-        lv_label_set_text(oil_title, "OIL TEMP");
-        lv_obj_set_style_text_font(oil_title, &lv_font_montserrat_32, 0);
-        lv_obj_set_style_text_color(oil_title, lv_color_hex(0xFFFFFF), 0);
-        lv_obj_align(oil_title, LV_ALIGN_CENTER, 0, -100);
-
-        // Oil temperature value
-        oil_label = lv_label_create(screen);
-        lv_label_set_text(oil_label, "-- F");
-        lv_obj_set_style_text_color(oil_label, lv_color_hex(0xFFFFFF), 0);
-        lv_obj_align(oil_label, LV_ALIGN_CENTER, 0, -30);
-
-        */
-
-        ui_init();
-        lvgl_unlock();
+        vTaskDelay(pdMS_TO_TICKS(60));
     }
 
 
+}
 
+void app_main(void) {
 
     // Error check
     ESP_ERROR_CHECK(can_sender_init());
 
-    //ui_init();
+    lcd_init();
+    lcd_lvgl_init();
 
-    // gauge example
-    float i = 60;
-    char oil_temp_text[16];
-
-
-    while (i < 250) {
-
+    // which ui to setup
     if (lvgl_lock(-1)) {
-        update_gauge(i);
+        if (testingMode) {
+            sensorTestUI();
 
-        snprintf(
-            oil_temp_text,
-            sizeof(oil_temp_text),
-            "%.0f F",
-            (double)i
-        );
-
-        // lv_label_set_text(oil_label, oil_temp_text);
-
+        }
+        else {
+            ui_init();
+            
+        }
         lvgl_unlock();
+
     }
-}
+
+    //which update to loop through
+    while (1) {
+
+        if (lvgl_lock(-1)) {
+
+            if (testingMode) {
+
+                sensorTestLoop();
+            }
+            else {
+
+                oilTempLoop();
+            }
+            lvgl_unlock();
+        }
+    }
 
 }
 
@@ -143,124 +240,3 @@ while (1) {
 }
 */
 
-/*
-    gpio_config_t button_config = {
-      .pin_bit_mask = (1ULL << BUTTON_GPIO),
-      .mode = GPIO_MODE_INPUT,
-      .pull_up_en = GPIO_PULLUP_ENABLE,
-      .pull_down_en = GPIO_PULLDOWN_DISABLE,
-      .intr_type = GPIO_INTR_DISABLE
-    };
-
-    gpio_config(&button_config);
-
-    // Error check
-    ESP_ERROR_CHECK(can_sender_init());
-
-    // init display
-    lcd_init();
-    lcd_clear();
-    lcd_set_cursor(0, 0);
-    lcd_print("Ready"); // print to screen
-
-
-
-    int current_display = 2;
-
-
-    while (1) {
-
-        if (gpio_get_level(BUTTON_GPIO) == 0) {
-            lcd_clear();
-            current_display++;
-            printf("press");
-
-            if (current_display > 3) {
-                current_display = 1;
-
-            }
-
-            // wait for button release
-            while (gpio_get_level(BUTTON_GPIO) == 0) {
-                vTaskDelay(pdMS_TO_TICKS(10));
-            }
-        }
-
-
-
-        if (current_display == 1) {
-            float rpm;
-
-
-            lcd_set_cursor(0, 0);
-            lcd_print("ENGINE RPM");
-
-            if (can_sender_request_pid(PID_RPM) == ESP_OK) {
-                if (can_sender_get_pid(PID_RPM, &rpm) == ESP_OK) {
-                    char rpm_text[16];
-
-                    snprintf(
-                        rpm_text,
-                        sizeof(rpm_text),
-                        "%.0f",
-                        rpm
-                    );
-
-                    lcd_set_cursor(0, 1);
-                    lcd_print(rpm_text);
-
-                    //print to console
-                    printf(
-                        "ENGINE RPM: %.0f\n",
-                        rpm
-                    );
-                }
-            }
-        }
-
-
-
-        else if (current_display == 2) {
-            float oil_temp;
-
-            lcd_set_cursor(0, 0);
-            lcd_print("OIL TEMP");
-
-            if (can_sender_request_pid(PID_OIL_TEMP) == ESP_OK) {
-                if (can_sender_get_pid(PID_OIL_TEMP, &oil_temp) == ESP_OK) {
-                    char oil_temp_text[16];
-
-                    snprintf(
-                        oil_temp_text,
-                        sizeof(oil_temp_text),
-                        "%.0f F",
-                        oil_temp
-                    );
-
-
-
-
-                    lcd_set_cursor(0, 1);
-                    lcd_print(oil_temp_text);
-
-                    //print to console
-                    printf(
-                        "OIL TEMP: %.0f F\n",
-                        oil_temp
-                    );
-                }
-            }
-
-        }
-        // check to see if button works
-        else if (current_display == 3) {
-            printf("display 3");
-            lcd_print("display 3");
-        }
-
-
-
-        vTaskDelay(pdMS_TO_TICKS(50));
-    }
-}
-*/

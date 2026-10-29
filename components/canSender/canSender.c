@@ -10,22 +10,6 @@
 #include "esp_twai.h"
 #include "esp_twai_onchip.h"
 
-
-
-static const char* TAG = "CAN_SENDER";
-
-typedef enum {
-    PID_TYPE_OBD01,   // OBD-II Service 01
-    PID_TYPE_NISSAN21 // Nissan Service 21
-} pid_type_t;
-
-typedef struct {
-    pid_id_t id;
-    const char* name;
-    pid_type_t type;
-    uint16_t pid;
-} pid_definition_t;
-
 /*
  * Sensor definitions
  *
@@ -37,16 +21,41 @@ typedef struct {
  * Service = 21
  * Nissan-specific PID = E0 04 01
  */
-static const pid_definition_t pid_definitions[PID_COUNT] = {
-    { .id = PID_RPM,
-     .name = "RPM",
-     .type = PID_TYPE_OBD01,
-     .pid = 0x0C },
 
-    { .id = PID_OIL_TEMP,
-     .name = "Oil Temp",
-     .type = PID_TYPE_NISSAN21,
-     .pid = 0xE004 } };
+
+static const sensor_definition_t sensor_definitions[SENSOR_COUNT] = {
+    {
+        .id = SENSOR_RPM,
+        .name = "RPM",
+        .protocol = SENSOR_PROTOCOL_OBD01,
+        .pid = 0x0C,
+        .decode = SENSOR_DECODE_RPM
+    },
+    {
+        .id = SENSOR_OIL_TEMP,
+        .name = "Oil Temp",
+        .protocol = SENSOR_PROTOCOL_NISSAN21,
+        .pid = 0xE004,
+        .decode = SENSOR_DECODE_OIL_TEMP
+    },
+    {
+        .id = SENSOR_ENGINE_LOAD,
+        .name = "Engine Load",
+        .protocol = SENSOR_PROTOCOL_OBD01,
+        .pid = 0x04,
+        .decode = SENSOR_DECODE_ENGINE_LOAD
+    },
+    {
+        .id = SENSOR_COOLANT_TEMP,
+        .name = "Coolant Temp",
+        .protocol = SENSOR_PROTOCOL_OBD01,
+        .pid = 0x05,
+        .decode = SENSOR_DECODE_COOLANT_TEMP
+    }
+};
+
+
+static const char* TAG = "CAN_SENDER";
 
 /*
  * CAN RX DATA
@@ -379,22 +388,23 @@ static esp_err_t can_sender_request_nissan21(uint16_t pid) {
 }
 
 
-esp_err_t can_sender_request_pid(pid_id_t pid_id) {
+esp_err_t can_sender_request_sensor(sensor_id_t sensor) {
 
-    if (pid_id >= PID_COUNT) {
+    if (sensor >= SENSOR_COUNT) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    const pid_definition_t* pid =
-        &pid_definitions[pid_id];
+    const sensor_definition_t* definition =
+        &sensor_definitions[sensor];
 
-    if (pid->type == PID_TYPE_OBD01) {
+
+      if (definition->protocol == SENSOR_PROTOCOL_OBD01) {
 
         return can_sender_request_OBD01(
-            (uint8_t)pid->pid);
+            (uint8_t)definition->pid);
     }
 
-  if (pid->type == PID_TYPE_NISSAN21) {
+  if (definition->protocol == SENSOR_PROTOCOL_NISSAN21) {
 
     /*
      * Start Nissan diagnostic session first
@@ -422,7 +432,7 @@ esp_err_t can_sender_request_pid(pid_id_t pid_id) {
      * Now request the Nissan PID
      */
     return can_sender_request_nissan21(
-        pid->pid);
+        definition->pid);
 }
 
     return ESP_ERR_INVALID_ARG;
@@ -437,20 +447,20 @@ esp_err_t can_sender_request_pid(pid_id_t pid_id) {
  *
  */
 
-static esp_err_t can_sender_get_pid_raw(
-    pid_id_t pid_id,
+static esp_err_t can_sender_get_sensor_raw(
+    sensor_id_t sensor,
     uint8_t* data,
     uint8_t* data_len) {
 
     if (data == NULL ||
         data_len == NULL ||
-        pid_id >= PID_COUNT) {
+        sensor >= SENSOR_COUNT) {
 
         return ESP_ERR_INVALID_ARG;
     }
 
-    const pid_definition_t* pid =
-        &pid_definitions[pid_id];
+    const sensor_definition_t* definition =
+        &sensor_definitions[sensor];
 
     TickType_t timeout =
         pdMS_TO_TICKS(200);
@@ -515,7 +525,7 @@ static esp_err_t can_sender_get_pid_raw(
          */
 
         if (
-            pid->type == PID_TYPE_OBD01 &&
+            definition->protocol == SENSOR_PROTOCOL_OBD01 &&
 
             frame->header.id == OBD_RESPONSE_ID &&
 
@@ -524,7 +534,7 @@ static esp_err_t can_sender_get_pid_raw(
             frame->buffer[1] == 0x41 &&
 
             frame->buffer[2] ==
-            (uint8_t)pid->pid
+            (uint8_t)definition->pid
             ) {
 
             uint8_t payload_len =
@@ -546,7 +556,7 @@ static esp_err_t can_sender_get_pid_raw(
          */
 
         if (
-            pid->type == PID_TYPE_NISSAN21 &&
+            definition->protocol == SENSOR_PROTOCOL_NISSAN21 &&
 
             frame->header.id == OBD_RESPONSE_ID &&
 
@@ -582,25 +592,23 @@ static esp_err_t can_sender_get_pid_raw(
  *
  */
 
-esp_err_t can_sender_get_pid(
-    pid_id_t pid_id,
-    float* value) {
+esp_err_t can_sender_get_sensor
+(sensor_id_t sensor, float* value) {
 
-    if (value == NULL ||
-        pid_id >= PID_COUNT) {
+    if (value == NULL || sensor >= SENSOR_COUNT) {
 
         return ESP_ERR_INVALID_ARG;
     }
+
+    const sensor_definition_t* definition =
+     &sensor_definitions[sensor];
+
 
     uint8_t data[8];
 
     uint8_t data_len = 0;
 
-    esp_err_t err =
-        can_sender_get_pid_raw(
-            pid_id,
-            data,
-            &data_len);
+    esp_err_t err = can_sender_get_sensor_raw(sensor, data, &data_len);
 
     if (err != ESP_OK) {
         return err;
@@ -618,7 +626,7 @@ esp_err_t can_sender_get_pid(
      * RPM = ((A * 256) + B) / 4
      */
 
-    if (pid_id == PID_RPM) {
+    if (definition->decode == SENSOR_DECODE_RPM) {
 
         if (data_len < 2) {
             return ESP_ERR_INVALID_RESPONSE;
@@ -646,7 +654,7 @@ esp_err_t can_sender_get_pid(
  * XX = raw temperature value
  */
 
-    if (pid_id == PID_OIL_TEMP) {
+    if (definition->decode == SENSOR_DECODE_OIL_TEMP) {
 
         if (data_len < 1) {
             return ESP_ERR_INVALID_RESPONSE;
@@ -658,6 +666,42 @@ esp_err_t can_sender_get_pid(
 
         return ESP_OK;
     }
+
+    if (definition->decode == SENSOR_DECODE_ENGINE_LOAD) {
+
+        if (data_len < 1) {
+            return ESP_ERR_INVALID_RESPONSE;
+        }
+
+        *value =
+            (float)data[0] * 100.0f / 255.0f;
+
+        return ESP_OK;
+    }
+    /*
+     * Coolant Temperature
+     *
+     * PID: 05
+     * Response: 41 05 A
+     *
+     * Temperature = A - 40 (Celsius)
+     */
+
+    if (definition->decode == SENSOR_DECODE_COOLANT_TEMP) {
+
+        if (data_len < 1) {
+            return ESP_ERR_INVALID_RESPONSE;
+        }
+
+        float temp_c =
+            (float)data[0] - 40.0f;
+
+        *value =
+            temp_c * 9.0f / 5.0f + 32.0f;
+
+        return ESP_OK;
+    }
+    
 
     return ESP_ERR_INVALID_ARG;
 }    

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "esp_err.h"
 
+#include "sensorConfig.h"
+
 #define TWAI_TX_GPIO 43
 #define TWAI_RX_GPIO 44
 #define TWAI_BITRATE 500000
@@ -13,17 +15,6 @@
 #define OBD_RESPONSE_ID 0x7E8 // ECU response
 
 /**
- * PID types.
- */
-typedef enum {
-    PID_RPM,
-    PID_OIL_TEMP,
-
-    PID_COUNT
-
-} pid_id_t;
-
-/**
  * Initialize the CAN/TWAI interface.
  */
 esp_err_t can_sender_init(void);
@@ -31,7 +22,7 @@ esp_err_t can_sender_init(void);
 /**
  * Send a request for a specific PID.
  */
-esp_err_t can_sender_request_pid(pid_id_t pid_id);
+esp_err_t can_sender_request_sensor(sensor_id_t sensor);
 
 /**
  * Wait for the ECU response and return the decoded value.
@@ -40,7 +31,7 @@ esp_err_t can_sender_request_pid(pid_id_t pid_id);
  *   ESP_OK          - Value successfully received
  *   ESP_ERR_TIMEOUT - No valid response received
  */
-esp_err_t can_sender_get_pid(pid_id_t pid_id, float* value);
+esp_err_t can_sender_get_sensor(sensor_id_t sensor, float* value);
 
 #endif // CAN_SENDER_H
 
